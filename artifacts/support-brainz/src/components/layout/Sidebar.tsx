@@ -52,54 +52,16 @@ export function Sidebar() {
     });
   };
 
-  const handleZendeskSubmit = (e: React.FormEvent) => {
+  const showDemoNotice = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!zdSubdomain || !zdApiKey) return;
-    
-    connectZendesk({ data: { subdomain: zdSubdomain, api_key: zdApiKey } }, {
-      onSuccess: (data) => {
-        setZdSubdomain("");
-        setZdApiKey("");
-        setOpenSection(null);
-        toast({
-          title: "Zendesk Connected",
-          description: data.message || `Imported ${data.imported} tickets successfully.`,
-        });
-      },
-      onError: (err: any) => {
-        toast({
-          variant: "destructive",
-          title: "Connection Failed",
-          description: err.message || "Could not connect to Zendesk.",
-        });
-      }
+    toast({
+      title: "Demo version",
+      description: "Live integrations are not yet supported in this demo. Use 'Load Demo Data' to explore the app with sample content.",
     });
   };
 
-  const handleConfluenceSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!cfUrl || !cfToken) return;
-    
-    connectConfluence({ data: { base_url: cfUrl, space_key: cfKey, api_token: cfToken } }, {
-      onSuccess: (data) => {
-        setCfUrl("");
-        setCfKey("");
-        setCfToken("");
-        setOpenSection(null);
-        toast({
-          title: "Confluence Connected",
-          description: data.message || `Imported ${data.imported} documents successfully.`,
-        });
-      },
-      onError: (err: any) => {
-        toast({
-          variant: "destructive",
-          title: "Connection Failed",
-          description: err.message || "Could not connect to Confluence.",
-        });
-      }
-    });
-  };
+  const handleZendeskSubmit = showDemoNotice;
+  const handleConfluenceSubmit = showDemoNotice;
 
   return (
     <div className="w-[320px] h-screen bg-sidebar border-r border-sidebar-border flex flex-col flex-shrink-0 z-20 shadow-2xl">
