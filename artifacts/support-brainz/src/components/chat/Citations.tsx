@@ -22,6 +22,10 @@ export function CitationsList({ citations }: { citations: Citation[] }) {
           >
             <div className="flex items-start justify-between gap-2 mb-2">
               <div className="flex items-center gap-1.5">
+                {/* Citation number matching inline [1][2][3] references */}
+                <span className="flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold bg-primary/20 text-primary border border-primary/30 flex-shrink-0">
+                  {idx + 1}
+                </span>
                 {cite.type === "ticket" ? (
                   <span className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
                     <Ticket className="w-3 h-3" /> Ticket

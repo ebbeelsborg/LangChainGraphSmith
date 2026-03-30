@@ -3,13 +3,13 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { useChatState } from "@/hooks/use-chat-state";
 import { ChatMessage } from "@/components/chat/ChatMessage";
 import { useSendMessage } from "@workspace/api-client-react";
-import { Send, Sparkles, MessageSquare } from "lucide-react";
+import { Send, Sparkles, MessageSquare, SquarePen } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 export function ChatLayout() {
-  const { messages, addMessage, updateMessage } = useChatState();
+  const { messages, addMessage, updateMessage, clearMessages } = useChatState();
   const { mutate: sendMessage } = useSendMessage();
   const [input, setInput] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -90,7 +90,7 @@ export function ChatLayout() {
     "How do I reset my password?",
     "What are the rate limits for the API?",
     "How do I configure SSO integration?",
-    "Steps to deploy to production."
+    "How do I deploy my app to production?"
   ];
 
   return (
@@ -98,7 +98,22 @@ export function ChatLayout() {
       <Sidebar />
       
       <main className="flex-1 flex flex-col relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-background to-background">
-        
+
+        {/* Top bar — only shown when there are messages */}
+        {messages.length > 0 && (
+          <div className="flex items-center justify-between px-6 py-3 border-b border-border/50 bg-background/60 backdrop-blur-md shrink-0">
+            <span className="text-sm font-medium text-foreground/80">SupportBrainz</span>
+            <button
+              onClick={clearMessages}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-accent"
+              title="Start a new chat"
+            >
+              <SquarePen className="w-3.5 h-3.5" />
+              New Chat
+            </button>
+          </div>
+        )}
+
         {/* Messages Area */}
         <div ref={scrollRef} className="flex-1 overflow-y-auto pb-32">
           {messages.length === 0 ? (
