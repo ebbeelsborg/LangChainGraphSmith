@@ -122,7 +122,7 @@ The frontend is a React single-page app built with Vite. It calls the FastAPI ba
 
 ### Replit AI Integration
 
-LLM calls go through Replit's AI Integrations proxy, which provides OpenAI-compatible access without requiring the user to supply their own API key. The proxy is used for the evaluate, refine, and generate steps via LangChain's `ChatOpenAI` client.
+LLM calls go through Replit's AI Integrations proxy, which provides OpenAI-compatible access without requiring the user to supply their own API key. The model used is **`gpt-5-mini`**, called via LangChain's `ChatOpenAI` client for the evaluate, refine, and generate steps. The proxy is available at `http://localhost:1106/modelfarm/openai` and is configured via the `AI_INTEGRATIONS_OPENAI_BASE_URL` environment variable.
 
 ---
 
