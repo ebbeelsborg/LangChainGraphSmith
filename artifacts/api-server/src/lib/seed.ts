@@ -735,6 +735,50 @@ Query your analytics programmatically:
 GET /api/analytics/metrics?from=2024-01-01&to=2024-01-31&metric=active_users`,
   },
   {
+    title: "Performance & Troubleshooting Guide",
+    url: "/docs/performance",
+    content: `# Performance & Troubleshooting Guide
+
+## App Feels Slow — Quick Checks
+1. **Browser**: Try a hard refresh (Ctrl+Shift+R / Cmd+Shift+R) to clear cached assets
+2. **Extensions**: Disable browser extensions — ad blockers and script blockers can add 200-500ms per page load
+3. **Network**: Run a speed test. If your connection is slow, switch to the mobile app which is optimized for lower bandwidth
+4. **Device**: Close unused tabs and applications to free memory
+
+## Slow Page Loads
+- Large workspaces (10,000+ items) can experience slower load times
+- Enable "Lazy Loading" in Settings > Performance to load content on demand instead of all at once
+- Use filters and search instead of browsing long lists
+
+## Slow Search Results
+Search indexing runs every 15 minutes. Newly added content may not appear immediately.
+If search is consistently slow (>5s), contact support — your search index may need rebuilding.
+
+## High API Latency
+Check status.ourapp.com for ongoing incidents.
+If latency is consistently high:
+- Use our status API to check: GET https://status.ourapp.com/api/v2/status.json
+- Try a different region endpoint (EU, US, Asia-Pacific) if available on your plan
+- Batch API requests to reduce round trips
+
+## Database / Data Not Loading
+- Clear application cache: Settings > Advanced > Clear Cache
+- If specific records aren't loading, they may have been archived or deleted
+- Check Audit Log to see recent changes: Settings > Security > Audit Log
+
+## Memory / Performance on Mobile
+- Force close and reopen the app to clear memory
+- Disable background refresh: Settings > [App] > Background App Refresh > Off
+- Reduce sync frequency in app settings if data is very large
+
+## Contacting Support for Performance Issues
+Include in your report:
+- Browser name and version
+- Time the issue occurred (with timezone)
+- Screenshot of browser console (F12 > Console) if there are JS errors
+- Network tab HAR file for slow load diagnosis`,
+  },
+  {
     title: "Webhook Event Reference",
     url: "/docs/webhook-events",
     content: `# Webhook Events Reference

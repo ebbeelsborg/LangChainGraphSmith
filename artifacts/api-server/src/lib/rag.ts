@@ -121,7 +121,7 @@ Always reference the source material in your answer using [1], [2], etc. notatio
     : `Context:\n${state.context}\n\nQuestion: ${state.query}\n\nAnswer based on the context above, citing sources with [1], [2], etc.`;
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-5-mini",
+    model: "gpt-4o-mini",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt },
@@ -129,7 +129,9 @@ Always reference the source material in your answer using [1], [2], etc. notatio
     max_completion_tokens: 600,
   });
 
-  const answer = completion.choices[0]?.message?.content ?? "I couldn't generate an answer. Please try again.";
+  const raw = completion.choices[0]?.message?.content;
+  logger.info({ finish_reason: completion.choices[0]?.finish_reason, raw_length: raw?.length ?? -1 }, "LLM generate response");
+  const answer = (raw && raw.trim().length > 0) ? raw : "I couldn't generate an answer based on the available documentation. Please try rephrasing your question or contact support.";
   return { answer };
 }
 
@@ -138,7 +140,7 @@ Always reference the source material in your answer using [1], [2], etc. notatio
 async function refineAndRetrieve(state: RagState): Promise<Partial<RagState>> {
   // Use the LLM to rephrase the query more broadly
   const completion = await openai.chat.completions.create({
-    model: "gpt-5-mini",
+    model: "gpt-4o-mini",
     messages: [
       {
         role: "system",
