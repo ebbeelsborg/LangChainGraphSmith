@@ -1,0 +1,247 @@
+Build a full-stack web application called **“Support Copilot”** that demonstrates a Retrieval-Augmented Generation (RAG) system for customer support.
+
+## Goal
+
+Create an AI assistant that answers user questions using:
+
+1. Product documentation (Confluence-style)
+2. Support tickets (Zendesk-style)
+
+The app should:
+
+* Use RAG with a PostgreSQL + pgvector database
+* Include a simple but structured agent workflow (not just a single LLM call)
+* Be usable via a web UI
+* Support both **synthetic demo data** and **optional real integrations (POC)**
+
+---
+
+## Tech Stack
+
+### Backend
+
+* Python
+* FastAPI
+* LangChain (for retrieval + prompting)
+* LangGraph (for workflow orchestration)
+* PostgreSQL with pgvector (vector search)
+* OpenAI API (or compatible LLM provider)
+
+### Frontend
+
+* React (Vite or similar)
+* Simple chat interface (like ChatGPT)
+* Minimal styling (clean, functional, not fancy)
+
+### Observability (optional but included in code)
+
+* LangSmith tracing (enabled via env var)
+
+---
+
+## Core Features
+
+### 1. Chat Interface
+
+* User can ask questions like:
+
+  * “Why are users getting billing errors?”
+  * “How do I reset passwords?”
+* Display:
+
+  * AI response
+  * Citations (source documents or tickets)
+
+---
+
+### 2. RAG System
+
+#### Data Types
+
+* **Documents** (Confluence-style)
+
+  * title
+  * content
+  * url (fake or real)
+* **Tickets** (Zendesk-style)
+
+  * ticket_id
+  * subject
+  * conversation text
+  * tags
+
+#### Storage
+
+* Store embeddings in PostgreSQL using pgvector
+* Use a single table or two tables (docs + tickets)
+
+#### Retrieval
+
+* Embed user query
+* Retrieve top-k relevant chunks (mix docs + tickets)
+* Pass into LLM prompt
+
+---
+
+### 3. LangGraph Workflow
+
+Implement a simple graph:
+
+* Node 1: Retrieve relevant documents + tickets
+* Node 2: Evaluate if context is sufficient
+* Node 3:
+
+  * If sufficient → generate answer with citations
+  * If not → refine query and retrieve again (1 retry max)
+
+Keep logic simple but explicit.
+
+---
+
+### 4. Synthetic Demo Data (IMPORTANT)
+
+On first run, seed the database with realistic fake data:
+
+#### Documents (10–20)
+
+Examples:
+
+* “Password Reset Guide”
+* “Billing FAQ”
+* “Subscription Management”
+* “Troubleshooting Login Issues”
+
+#### Tickets (20–50)
+
+Examples:
+
+* “User cannot log in after password reset”
+* “Payment failing for EU customers”
+* “App crashes on checkout”
+
+Make data slightly messy and redundant to demonstrate RAG value.
+
+---
+
+### 5. Optional Integrations (POC only)
+
+Add simple endpoints:
+
+#### Zendesk
+
+* Accept API key + subdomain
+* Fetch recent tickets (limit to ~20)
+* Store them in vector DB
+
+#### Confluence
+
+* Accept API token + base URL
+* Fetch a few pages
+* Store as documents
+
+These do NOT need full OAuth or production readiness.
+Just basic API calls are enough.
+
+---
+
+### 6. API Endpoints (FastAPI)
+
+* POST /chat
+
+  * input: user query
+  * output: answer + citations
+
+* POST /seed
+
+  * seeds synthetic data
+
+* POST /integrations/zendesk
+
+* POST /integrations/confluence
+
+---
+
+### 7. Frontend UI (React)
+
+Pages/components:
+
+* Chat page
+
+  * input box
+  * message list
+  * show citations under each answer
+
+* Sidebar
+
+  * “Load Demo Data” button
+  * “Connect Zendesk” (form)
+  * “Connect Confluence” (form)
+
+Keep UI simple and functional.
+
+---
+
+### 8. Environment Variables
+
+* OPENAI_API_KEY
+* DATABASE_URL (Postgres with pgvector)
+* LANGCHAIN_TRACING_V2 (optional)
+* LANGCHAIN_API_KEY (optional)
+
+---
+
+### 9. Project Structure
+
+/backend
+/app
+main.py
+rag.py
+graph.py
+db.py
+integrations/
+requirements.txt
+
+/frontend
+/src
+App.jsx
+Chat.jsx
+Sidebar.jsx
+
+---
+
+### 10. Important Implementation Notes
+
+* Do NOT over-engineer
+* Keep total backend code under ~300–400 lines if possible
+* Use clear, readable functions
+* Prioritize clarity over abstraction
+* Add comments explaining:
+
+  * RAG flow
+  * LangGraph decisions
+
+---
+
+### 11. README
+
+Include:
+
+* What the app does
+* Architecture diagram (text is fine)
+* How RAG works here
+* How LangGraph is used
+* How to run locally
+* Example questions to try
+
+---
+
+## Expected Outcome
+
+A working web app where a user can:
+
+* Load demo data
+* Ask questions
+* See grounded answers with citations
+* Optionally connect external systems (POC)
+
+The project should feel like a **realistic internal support AI tool**, not a tutorial toy.
