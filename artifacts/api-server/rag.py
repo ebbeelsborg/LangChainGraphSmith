@@ -6,6 +6,7 @@ from langgraph.graph import StateGraph, END
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
+from langsmith import traceable
 
 import psycopg2
 import psycopg2.extras
@@ -23,6 +24,7 @@ def get_embedding_model() -> TextEmbedding:
         _embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
     return _embedding_model
 
+@traceable(run_type="embedding", name="fastembed_bge_small")
 def embed_text(text: str) -> List[float]:
     model = get_embedding_model()
     embeddings = list(model.embed([text]))
@@ -61,6 +63,7 @@ def vector_to_pg(vec: List[float]) -> str:
     return "[" + ",".join(str(v) for v in vec) + "]"
 
 
+@traceable(run_type="retriever", name="pgvector_similarity_search")
 def retrieve_similar(embedding: List[float], table: str, limit: int) -> List[dict]:
     vec_str = vector_to_pg(embedding)
     with get_db_conn() as conn:
@@ -168,6 +171,7 @@ def build_citations_and_context(docs: List[dict], tickets: List[dict]) -> tuple[
 
 
 # ─── LangGraph Nodes ──────────────────────────────────────────────────────────
+@traceable(run_type="retriever", name="retrieve_node")
 def retrieve_node(state: RAGState) -> dict:
     query = state["query"]
     embedding = embed_text(query)
@@ -185,6 +189,7 @@ def retrieve_node(state: RAGState) -> dict:
     }
 
 
+@traceable(run_type="llm", name="evaluate_node")
 def evaluate_node(state: RAGState) -> dict:
     if not state.get("context") or len(state["context"]) < 100:
         return {"sufficient": False}
@@ -201,6 +206,7 @@ def evaluate_node(state: RAGState) -> dict:
     return {"sufficient": sufficient}
 
 
+@traceable(run_type="chain", name="refine_node")
 def refine_node(state: RAGState) -> dict:
     try:
         llm = get_llm()
@@ -232,6 +238,7 @@ def refine_node(state: RAGState) -> dict:
     }
 
 
+@traceable(run_type="llm", name="generate_node")
 def generate_node(state: RAGState) -> dict:
     try:
         llm = get_llm()
@@ -282,6 +289,7 @@ def get_rag_graph():
 
 
 # ─── Public entrypoint ────────────────────────────────────────────────────────
+@traceable(run_type="chain", name="run_rag")
 def run_rag(query: str) -> dict:
     graph = get_rag_graph()
     initial_state: RAGState = {

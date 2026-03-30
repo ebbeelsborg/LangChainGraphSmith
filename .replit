@@ -28,3 +28,10 @@ timeoutMs = 20000
 [nix]
 channel = "stable-25_05"
 packages = ["postgresql"]
+
+[userenv]
+
+[userenv.shared]
+LANGSMITH_PROJECT = "supportbrainz"
+LANGSMITH_ENDPOINT = "https://eu.api.smith.langchain.com"
+LANGSMITH_TRACING = "true"

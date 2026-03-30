@@ -4,11 +4,16 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 # ─── LangSmith / LangChain tracing setup (must be before other langchain imports) ──
+# User-configured env vars: LANGSMITH_API_KEY, LANGSMITH_TRACING, LANGSMITH_ENDPOINT, LANGSMITH_PROJECT
+# Map to LANGCHAIN_* for backward-compat with LangChain's internal callback system
 langsmith_key = os.environ.get("LANGSMITH_API_KEY", "")
 if langsmith_key:
     os.environ["LANGCHAIN_API_KEY"] = langsmith_key
-    os.environ["LANGCHAIN_TRACING_V2"] = "true"
-    os.environ["LANGCHAIN_PROJECT"] = "supportbrainz"
+    os.environ["LANGCHAIN_TRACING_V2"] = os.environ.get("LANGSMITH_TRACING", "true")
+    os.environ["LANGCHAIN_PROJECT"] = os.environ.get("LANGSMITH_PROJECT", "supportbrainz")
+    endpoint = os.environ.get("LANGSMITH_ENDPOINT", "")
+    if endpoint:
+        os.environ["LANGCHAIN_ENDPOINT"] = endpoint
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
