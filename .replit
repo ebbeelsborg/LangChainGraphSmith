@@ -35,4 +35,3 @@ packages = ["postgresql"]
 LANGSMITH_PROJECT = "supportbrainz"
 LANGSMITH_ENDPOINT = "https://eu.api.smith.langchain.com"
 LANGSMITH_TRACING = "true"
-LANGSMITH_WORKSPACE_ID = "1"
