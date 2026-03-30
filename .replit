@@ -33,6 +33,6 @@ packages = ["postgresql"]
 
 [userenv.shared]
 LANGSMITH_PROJECT = "supportbrainz"
-LANGSMITH_ENDPOINT = "https://api.smith.langchain.com"
+LANGSMITH_ENDPOINT = "https://eu.api.smith.langchain.com"
 LANGSMITH_TRACING = "true"
 LANGSMITH_WORKSPACE_ID = "1"

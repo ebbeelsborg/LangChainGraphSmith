@@ -3,17 +3,22 @@ import logging
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
-# ─── LangSmith / LangChain tracing setup (must be before other langchain imports) ──
-# User-configured env vars: LANGSMITH_API_KEY, LANGSMITH_TRACING, LANGSMITH_ENDPOINT, LANGSMITH_PROJECT
-# Map to LANGCHAIN_* for backward-compat with LangChain's internal callback system
-langsmith_key = os.environ.get("LANGSMITH_API_KEY", "")
-if langsmith_key:
-    os.environ["LANGCHAIN_API_KEY"] = langsmith_key
-    os.environ["LANGCHAIN_TRACING_V2"] = os.environ.get("LANGSMITH_TRACING", "true")
-    os.environ["LANGCHAIN_PROJECT"] = os.environ.get("LANGSMITH_PROJECT", "supportbrainz")
-    endpoint = os.environ.get("LANGSMITH_ENDPOINT", "")
-    if endpoint:
-        os.environ["LANGCHAIN_ENDPOINT"] = endpoint
+# ─── LangSmith tracing setup (must be before other langchain imports) ──────────
+# The SDK (0.7.x+) reads LANGSMITH_* env vars natively — no LANGCHAIN_* mapping needed.
+# Env vars configured in Replit secrets:
+#   LANGSMITH_API_KEY, LANGSMITH_TRACING, LANGSMITH_ENDPOINT, LANGSMITH_PROJECT
+# Log what we see at startup to make key issues visible.
+_ls_key = os.environ.get("LANGSMITH_API_KEY", "")
+_ls_endpoint = os.environ.get("LANGSMITH_ENDPOINT", "(default)")
+_ls_tracing = os.environ.get("LANGSMITH_TRACING", "(not set)")
+_ls_project = os.environ.get("LANGSMITH_PROJECT", "(not set)")
+# Log non-sensitive prefix only for diagnosis
+import logging as _logging
+_logging.basicConfig(level=_logging.INFO)
+_logging.getLogger(__name__).info(
+    f"LangSmith config — endpoint: {_ls_endpoint}, tracing: {_ls_tracing}, "
+    f"project: {_ls_project}, key_set: {bool(_ls_key)}, key_prefix: {_ls_key[:12]}..."
+)
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
