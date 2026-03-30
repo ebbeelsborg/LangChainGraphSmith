@@ -1,22 +1,26 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: SupportBrainz API - RAG-powered support assistant
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: chat
+    description: Chat and RAG operations
+  - name: seed
+    description: Demo data seeding
+  - name: integrations
+    description: External integrations
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +28,126 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /chat:
+    post:
+      operationId: sendMessage
+      tags: [chat]
+      summary: Send a message and get a RAG-powered answer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatRequest"
+      responses:
+        "200":
+          description: Answer with citations
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /seed:
+    post:
+      operationId: seedData
+      tags: [seed]
+      summary: Seed the database with synthetic demo data
+      responses:
+        "200":
+          description: Seeding result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeedResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /seed/status:
+    get:
+      operationId: getSeedStatus
+      tags: [seed]
+      summary: Check if demo data is loaded
+      responses:
+        "200":
+          description: Seed status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SeedStatus"
+
+  /integrations/zendesk:
+    post:
+      operationId: connectZendesk
+      tags: [integrations]
+      summary: Connect Zendesk and import tickets
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZendeskConfig"
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /integrations/confluence:
+    post:
+      operationId: connectConfluence
+      tags: [integrations]
+      summary: Connect Confluence and import pages
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfluenceConfig"
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IntegrationResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +158,130 @@ components:
       required:
         - status
 
+    ChatRequest:
+      type: object
+      properties:
+        query:
+          type: string
+          description: The user's question
+      required:
+        - query
+
+    Citation:
+      type: object
+      properties:
+        id:
+          type: integer
+        type:
+          type: string
+          enum: [document, ticket]
+        title:
+          type: string
+        url:
+          type: string
+        snippet:
+          type: string
+        score:
+          type: number
+      required:
+        - id
+        - type
+        - title
+        - snippet
+        - score
+
+    ChatResponse:
+      type: object
+      properties:
+        answer:
+          type: string
+        citations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Citation"
+        retrieval_steps:
+          type: integer
+          description: Number of retrieval steps taken (1 or 2)
+      required:
+        - answer
+        - citations
+        - retrieval_steps
+
+    SeedResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        documents_seeded:
+          type: integer
+        tickets_seeded:
+          type: integer
+        message:
+          type: string
+      required:
+        - success
+        - documents_seeded
+        - tickets_seeded
+        - message
+
+    SeedStatus:
+      type: object
+      properties:
+        seeded:
+          type: boolean
+        document_count:
+          type: integer
+        ticket_count:
+          type: integer
+      required:
+        - seeded
+        - document_count
+        - ticket_count
+
+    ZendeskConfig:
+      type: object
+      properties:
+        api_key:
+          type: string
+        subdomain:
+          type: string
+      required:
+        - api_key
+        - subdomain
+
+    ConfluenceConfig:
+      type: object
+      properties:
+        api_token:
+          type: string
+        base_url:
+          type: string
+        space_key:
+          type: string
+      required:
+        - api_token
+        - base_url
+
+    IntegrationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        imported:
+          type: integer
+        message:
+          type: string
+      required:
+        - success
+        - imported
+        - message
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        detail:
+          type: string
+      required:
+        - error

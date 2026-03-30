@@ -1,0 +1,16 @@
+packages:
+  "framer-motion": "For smooth message entry animations, layouts, and page transitions"
+  "react-markdown": "To render AI responses with proper markdown formatting"
+  "remark-gfm": "For github flavored markdown support in AI responses (tables, lists)"
+  "lucide-react": "For crisp, professional, consistent iconography"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility for merging tailwind classes safely"
+
+images:
+  - path: "artifacts/support-brainz/public/images/logo.png"
+    description: "A sleek, minimal geometric brain or spark icon in glowing neon blue on a dark/transparent background, suitable for a dark mode enterprise AI tool."
+    aspect_ratio: "1:1"
+
+notes:
+  - "Assuming generated API hooks from @workspace/api-client-react are fully typed and available."
+  - "Chat endpoint is standard REST (not SSE), so frontend handles loading states and renders complete response once received."

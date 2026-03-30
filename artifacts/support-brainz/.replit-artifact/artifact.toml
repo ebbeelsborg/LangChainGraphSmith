@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "SupportBrainz"
+version = "1.0.0"
+id = "artifacts/support-brainz"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23366
+
+[services.development]
+run = "pnpm --filter @workspace/support-brainz run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/support-brainz", "run", "build" ]
+publicDir = "artifacts/support-brainz/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23366"
+BASE_PATH = "/"
