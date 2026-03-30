@@ -4,7 +4,7 @@ import { useChatState } from "@/hooks/use-chat-state";
 import { ChatMessage } from "@/components/chat/ChatMessage";
 import { CitationModal } from "@/components/chat/CitationModal";
 import { useSendMessage, Citation } from "@workspace/api-client-react";
-import { Send, Sparkles, MessageSquare, SquarePen, House } from "lucide-react";
+import { Send, Sparkles, MessageSquare, SquarePen } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -107,24 +107,14 @@ export function ChatLayout() {
         {messages.length > 0 && (
           <div className="flex items-center justify-between px-6 py-3 border-b border-border/50 bg-background/60 backdrop-blur-md shrink-0">
             <span className="text-sm font-medium text-foreground/80">SupportBrainz</span>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={handleGoHome}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-accent"
-                title="Go to home"
-              >
-                <House className="w-3.5 h-3.5" />
-                Home
-              </button>
-              <button
-                onClick={handleGoHome}
-                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-accent"
-                title="Start a new chat"
-              >
-                <SquarePen className="w-3.5 h-3.5" />
-                New Chat
-              </button>
-            </div>
+            <button
+              onClick={handleGoHome}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-accent"
+              title="Start a new chat"
+            >
+              <SquarePen className="w-3.5 h-3.5" />
+              New Chat
+            </button>
           </div>
         )}
 
