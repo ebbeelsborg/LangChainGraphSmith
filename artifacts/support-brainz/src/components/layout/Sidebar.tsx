@@ -13,11 +13,7 @@ import { Button, Input, Label } from "@/components/ui/shared";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-interface SidebarProps {
-  onHome?: () => void;
-}
-
-export function Sidebar({ onHome }: SidebarProps) {
+export function Sidebar() {
   const { data: seedStatus, isLoading: statusLoading } = useGetSeedStatus();
   const { mutate: seedData, isPending: isSeeding } = useSeedData();
   const { mutate: connectZendesk, isPending: isConnectingZendesk } = useConnectZendesk();
@@ -107,21 +103,17 @@ export function Sidebar({ onHome }: SidebarProps) {
 
   return (
     <div className="w-[320px] h-screen bg-sidebar border-r border-sidebar-border flex flex-col flex-shrink-0 z-20 shadow-2xl">
-      {/* Brand Header — clicking acts as Home */}
-      <button
-        onClick={onHome}
-        className="h-16 px-6 flex items-center border-b border-border/50 w-full text-left hover:bg-accent/40 transition-colors group"
-        title="Go to home"
-      >
-        <img 
-          src={`${import.meta.env.BASE_URL}images/logo.png`} 
-          alt="SupportBrainz" 
-          className="w-8 h-8 mr-3 object-contain drop-shadow-[0_0_8px_rgba(59,130,246,0.5)] group-hover:drop-shadow-[0_0_12px_rgba(59,130,246,0.8)] transition-all" 
+      {/* Brand Header */}
+      <div className="h-16 px-6 flex items-center border-b border-border/50">
+        <img
+          src={`${import.meta.env.BASE_URL}images/logo.png`}
+          alt="SupportBrainz"
+          className="w-8 h-8 mr-3 object-contain drop-shadow-[0_0_8px_rgba(59,130,246,0.5)]"
         />
         <h1 className="font-display font-bold text-lg text-foreground tracking-wide">
           SupportBrainz
         </h1>
-      </button>
+      </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
         

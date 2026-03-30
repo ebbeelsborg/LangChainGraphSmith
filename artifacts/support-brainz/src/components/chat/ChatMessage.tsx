@@ -6,8 +6,14 @@ import { Message } from "@/hooks/use-chat-state";
 import { CitationsList } from "./Citations";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import { Citation } from "@workspace/api-client-react";
 
-export function ChatMessage({ message }: { message: Message }) {
+interface ChatMessageProps {
+  message: Message;
+  onCitationClick: (citation: Citation) => void;
+}
+
+export function ChatMessage({ message, onCitationClick }: ChatMessageProps) {
   const isAi = message.role === "assistant";
 
   return (
@@ -60,7 +66,9 @@ export function ChatMessage({ message }: { message: Message }) {
             </div>
           )}
 
-          {message.citations && <CitationsList citations={message.citations} />}
+          {message.citations && (
+            <CitationsList citations={message.citations} onCitationClick={onCitationClick} />
+          )}
         </div>
       </div>
     </motion.div>

@@ -1,9 +1,14 @@
 import React from "react";
-import { FileText, Ticket, ExternalLink } from "lucide-react";
+import { FileText, Ticket } from "lucide-react";
 import { Citation } from "@workspace/api-client-react";
 import { motion } from "framer-motion";
 
-export function CitationsList({ citations }: { citations: Citation[] }) {
+interface CitationsListProps {
+  citations: Citation[];
+  onCitationClick: (citation: Citation) => void;
+}
+
+export function CitationsList({ citations, onCitationClick }: CitationsListProps) {
   if (!citations || citations.length === 0) return null;
 
   return (
@@ -13,14 +18,16 @@ export function CitationsList({ citations }: { citations: Citation[] }) {
       </h4>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {citations.map((cite, idx) => (
-          <motion.div 
+          <motion.button
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.1 }}
             key={idx}
-            className="group relative bg-background/50 border border-border rounded-xl p-3 hover:border-primary/50 hover:bg-background transition-all duration-300"
+            onClick={() => onCitationClick(cite)}
+            className="group text-left relative bg-background/50 border border-border rounded-xl p-3 hover:border-primary/50 hover:bg-background transition-all duration-300 cursor-pointer w-full"
+            title="Click to view full content"
           >
-            <div className="flex items-start justify-between gap-2 mb-2">
+            <div className="flex items-start gap-2 mb-2">
               <div className="flex items-center gap-1.5">
                 {/* Citation number matching inline [1][2][3] references */}
                 <span className="flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold bg-primary/20 text-primary border border-primary/30 flex-shrink-0">
@@ -41,26 +48,15 @@ export function CitationsList({ citations }: { citations: Citation[] }) {
                   </span>
                 )}
               </div>
-              
-              {cite.url && (
-                <a 
-                  href={cite.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-muted-foreground hover:text-primary transition-colors"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              )}
             </div>
-            
+
             <h5 className="text-sm font-medium text-foreground mb-1 line-clamp-1 group-hover:text-primary transition-colors">
               {cite.title}
             </h5>
             <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
               "{cite.snippet}"
             </p>
-          </motion.div>
+          </motion.button>
         ))}
       </div>
     </div>

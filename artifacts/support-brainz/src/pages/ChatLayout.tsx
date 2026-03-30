@@ -2,8 +2,9 @@ import React, { useRef, useEffect, useState } from "react";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { useChatState } from "@/hooks/use-chat-state";
 import { ChatMessage } from "@/components/chat/ChatMessage";
-import { useSendMessage } from "@workspace/api-client-react";
-import { Send, Sparkles, MessageSquare, SquarePen } from "lucide-react";
+import { CitationModal } from "@/components/chat/CitationModal";
+import { useSendMessage, Citation } from "@workspace/api-client-react";
+import { Send, Sparkles, MessageSquare, SquarePen, House } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -12,6 +13,7 @@ export function ChatLayout() {
   const { messages, addMessage, updateMessage, clearMessages } = useChatState();
   const { mutate: sendMessage } = useSendMessage();
   const [input, setInput] = useState("");
+  const [selectedCitation, setSelectedCitation] = useState<Citation | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { toast } = useToast();
@@ -52,15 +54,12 @@ export function ChatLayout() {
       textareaRef.current.style.height = 'auto';
     }
 
-    // Add user message
     const userMsgId = crypto.randomUUID();
     addMessage({ id: userMsgId, role: "user", content: userQuery });
 
-    // Add loading AI message
     const aiMsgId = crypto.randomUUID();
     addMessage({ id: aiMsgId, role: "assistant", content: "", isPending: true });
 
-    // Call API
     sendMessage({ data: { query: userQuery } }, {
       onSuccess: (data) => {
         updateMessage(aiMsgId, {
@@ -100,22 +99,32 @@ export function ChatLayout() {
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden text-foreground selection:bg-primary/30">
-      <Sidebar onHome={handleGoHome} />
-      
+      <Sidebar />
+
       <main className="flex-1 flex flex-col relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-background to-background">
 
         {/* Top bar — only shown when there are messages */}
         {messages.length > 0 && (
           <div className="flex items-center justify-between px-6 py-3 border-b border-border/50 bg-background/60 backdrop-blur-md shrink-0">
             <span className="text-sm font-medium text-foreground/80">SupportBrainz</span>
-            <button
-              onClick={handleGoHome}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-accent"
-              title="Start a new chat"
-            >
-              <SquarePen className="w-3.5 h-3.5" />
-              New Chat
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleGoHome}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-accent"
+                title="Go to home"
+              >
+                <House className="w-3.5 h-3.5" />
+                Home
+              </button>
+              <button
+                onClick={handleGoHome}
+                className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-accent"
+                title="Start a new chat"
+              >
+                <SquarePen className="w-3.5 h-3.5" />
+                New Chat
+              </button>
+            </div>
           </div>
         )}
 
@@ -131,7 +140,7 @@ export function ChatLayout() {
               >
                 <Sparkles className="w-8 h-8 text-primary" />
               </motion.div>
-              <motion.h2 
+              <motion.h2
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.1 }}
@@ -139,7 +148,7 @@ export function ChatLayout() {
               >
                 How can I help you today?
               </motion.h2>
-              <motion.p 
+              <motion.p
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.2 }}
@@ -147,8 +156,8 @@ export function ChatLayout() {
               >
                 I'm SupportBrainz, a RAG-powered assistant connected to your knowledge base and tickets. I can help you answer support requests.
               </motion.p>
-              
-              <motion.div 
+
+              <motion.div
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ delay: 0.3 }}
@@ -170,7 +179,11 @@ export function ChatLayout() {
             <div className="flex flex-col">
               <AnimatePresence initial={false}>
                 {messages.map((msg) => (
-                  <ChatMessage key={msg.id} message={msg} />
+                  <ChatMessage
+                    key={msg.id}
+                    message={msg}
+                    onCitationClick={setSelectedCitation}
+                  />
                 ))}
               </AnimatePresence>
             </div>
@@ -180,7 +193,7 @@ export function ChatLayout() {
         {/* Input Area */}
         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-background via-background to-transparent pt-12">
           <div className="max-w-4xl mx-auto relative">
-            <form 
+            <form
               onSubmit={handleSubmit}
               className="relative flex items-end shadow-xl shadow-black/20 rounded-2xl overflow-hidden border border-border bg-card/80 backdrop-blur-xl focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all"
             >
@@ -198,8 +211,8 @@ export function ChatLayout() {
                 disabled={!input.trim() || isGenerating}
                 className={cn(
                   "absolute right-3 bottom-3 p-2 rounded-xl transition-all duration-200",
-                  input.trim() && !isGenerating 
-                    ? "bg-primary text-primary-foreground shadow-[0_0_15px_rgba(59,130,246,0.4)] hover:bg-primary/90 hover:scale-105 active:scale-95" 
+                  input.trim() && !isGenerating
+                    ? "bg-primary text-primary-foreground shadow-[0_0_15px_rgba(59,130,246,0.4)] hover:bg-primary/90 hover:scale-105 active:scale-95"
                     : "bg-accent text-muted-foreground cursor-not-allowed"
                 )}
               >
@@ -213,6 +226,12 @@ export function ChatLayout() {
         </div>
 
       </main>
+
+      {/* Citation detail modal */}
+      <CitationModal
+        citation={selectedCitation}
+        onClose={() => setSelectedCitation(null)}
+      />
     </div>
   );
 }
