@@ -44,50 +44,79 @@ export interface RagState {
 // ─── Node 1: Retrieve ───────────────────────────────────────────────────────
 
 async function retrieve(state: RagState): Promise<Partial<RagState>> {
-  const { rows: docs } = await pool.query<{
-    id: number; title: string; content: string; url: string; similarity: number;
-  }>(
-    `SELECT id, title, content, url,
-            1 - (embedding <=> $1::vector) AS similarity
-     FROM documents
-     WHERE embedding IS NOT NULL
-     ORDER BY embedding <=> $1::vector
-     LIMIT $2`,
-    [`[${state.embedding.join(",")}]`, TOP_K]
-  );
+  const embVec = `[${state.embedding.join(",")}]`;
 
-  const { rows: tickets } = await pool.query<{
-    id: number; subject: string; conversation: string; ticket_id: string; similarity: number;
-  }>(
-    `SELECT id, subject, conversation, ticket_id,
-            1 - (embedding <=> $1::vector) AS similarity
-     FROM tickets
-     WHERE embedding IS NOT NULL
-     ORDER BY embedding <=> $1::vector
-     LIMIT $2`,
-    [`[${state.embedding.join(",")}]`, TOP_K]
-  );
+  // Use a dedicated client so SET LOCAL applies to all vector queries in the same
+  // session. probes=10 ensures the ivfflat index (lists=10) searches all clusters,
+  // preventing sparse query vectors from missing relevant documents.
+  const client = await pool.connect();
+  let docs: Array<{ id: number; title: string; content: string; url: string; similarity: number }> = [];
+  let tickets: Array<{ id: number; subject: string; conversation: string; ticket_id: string; similarity: number }> = [];
 
-  const citations: Citation[] = [
-    ...docs.map((d) => ({
-      id: d.id,
-      type: "document" as const,
-      title: d.title,
-      url: d.url,
-      snippet: d.content.slice(0, 300),
-      score: parseFloat(String(d.similarity)),
-    })),
-    ...tickets.map((t) => ({
-      id: t.id,
-      type: "ticket" as const,
-      title: t.subject,
-      url: t.ticket_id ? `#${t.ticket_id}` : undefined,
-      snippet: t.conversation.slice(0, 300),
-      score: parseFloat(String(t.similarity)),
-    })),
-  ]
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 8);
+  try {
+    await client.query("BEGIN");
+    await client.query("SET LOCAL ivfflat.probes = 10");
+
+    const docResult = await client.query<{
+      id: number; title: string; content: string; url: string; similarity: number;
+    }>(
+      `SELECT id, title, content, url,
+              1 - (embedding <=> $1::vector) AS similarity
+       FROM documents
+       WHERE embedding IS NOT NULL
+       ORDER BY embedding <=> $1::vector
+       LIMIT $2`,
+      [embVec, TOP_K]
+    );
+    docs = docResult.rows;
+
+    const ticketResult = await client.query<{
+      id: number; subject: string; conversation: string; ticket_id: string; similarity: number;
+    }>(
+      `SELECT id, subject, conversation, ticket_id,
+              1 - (embedding <=> $1::vector) AS similarity
+       FROM tickets
+       WHERE embedding IS NOT NULL
+       ORDER BY embedding <=> $1::vector
+       LIMIT $2`,
+      [embVec, TOP_K]
+    );
+    tickets = ticketResult.rows;
+
+    await client.query("COMMIT");
+  } finally {
+    client.release();
+  }
+
+  logger.info({ doc_count: docs.length, ticket_count: tickets.length, top_doc: docs[0]?.title }, "Retrieval results");
+
+  const docCitations: Citation[] = docs.map((d) => ({
+    id: d.id,
+    type: "document" as const,
+    title: d.title,
+    url: d.url,
+    snippet: d.content.slice(0, 300),
+    score: parseFloat(String(d.similarity)),
+  }));
+
+  const ticketCitations: Citation[] = tickets.map((t) => ({
+    id: t.id,
+    type: "ticket" as const,
+    title: t.subject,
+    url: t.ticket_id ? `#${t.ticket_id}` : undefined,
+    snippet: t.conversation.slice(0, 300),
+    score: parseFloat(String(t.similarity)),
+  }));
+
+  // Always include top 3 documents to ensure structured docs appear in context,
+  // then fill remaining slots with the highest-scoring tickets.
+  // This prevents long documents from being outranked by short keyword-dense tickets.
+  const guaranteedDocs = docCitations.slice(0, 3);
+  const remainingSlots = 8 - guaranteedDocs.length;
+  const topTickets = ticketCitations.slice(0, remainingSlots);
+
+  const citations: Citation[] = [...guaranteedDocs, ...topTickets]
+    .sort((a, b) => b.score - a.score);
 
   const context = citations
     .map((c, i) => `[${i + 1}] ${c.type.toUpperCase()} — ${c.title}\n${c.snippet}`)

@@ -140,7 +140,7 @@ export function ChatLayout() {
                 transition={{ delay: 0.2 }}
                 className="text-muted-foreground mb-10 text-lg"
               >
-                I'm SupportBrainz, a RAG-powered assistant connected to your knowledge base and tickets.
+                I'm SupportBrainz, a RAG-powered assistant connected to your knowledge base and tickets. I can help you answer support requests.
               </motion.p>
               
               <motion.div 

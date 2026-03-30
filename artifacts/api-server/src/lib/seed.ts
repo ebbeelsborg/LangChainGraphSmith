@@ -142,27 +142,50 @@ Safari on iOS sometimes blocks third-party iframes. If Stripe form doesn't appea
   {
     title: "API Rate Limits",
     url: "/docs/api-rate-limits",
-    content: `# API Rate Limits
+    content: `# API Rate Limits — How Rate Limiting Works
 
-## Default Limits
-- Free plan: 100 requests/hour
-- Pro plan: 5,000 requests/hour  
-- Enterprise: custom limits
+This document explains the API rate limits for all plans. Understanding API rate limits helps you build reliable integrations that stay within the allowed request thresholds.
 
-## Rate Limit Headers
-Every response includes:
-- X-RateLimit-Limit: your limit
-- X-RateLimit-Remaining: remaining requests
-- X-RateLimit-Reset: Unix timestamp when limit resets
+## What Are API Rate Limits?
+API rate limits control how many API requests you can make per hour. Rate limits protect the API from overuse and ensure fair access for all customers. Every plan has defined API rate limits.
 
-## 429 Too Many Requests
-If you hit the limit, wait until the reset time. Implement exponential backoff in your code.
+## API Rate Limits by Plan
+The API rate limits vary by subscription plan:
+- **Free plan**: 100 API requests per hour (rate limit: 100 req/hr)
+- **Pro plan**: 5,000 API requests per hour (rate limit: 5,000 req/hr)
+- **Business plan**: 20,000 API requests per hour (rate limit: 20,000 req/hr)
+- **Enterprise plan**: Custom API rate limits — contact us for higher rate limits
 
-## Webhooks
-Webhook deliveries don't count toward rate limits.
+## How to Check Your Current Rate Limit
+Every API response includes rate limit headers so you can track how close you are to your limit:
+- \`X-RateLimit-Limit\`: your total API rate limit (requests per hour)
+- \`X-RateLimit-Remaining\`: API requests remaining before hitting the rate limit
+- \`X-RateLimit-Reset\`: Unix timestamp when the rate limit window resets
 
-## Increasing Limits
-Contact enterprise@ourapp.com or upgrade your plan.`,
+## What Happens When You Hit the API Rate Limit?
+When you exceed your API rate limits, the API returns:
+- HTTP status **429 Too Many Requests**
+- A \`Retry-After\` header indicating when rate limits reset
+
+To avoid hitting rate limits, implement exponential backoff: wait 1s, then 2s, then 4s after each 429 response. Cache API responses where possible to reduce the total number of API requests.
+
+## Rate Limits for Specific Endpoints
+Some API endpoints have stricter rate limits than the general limit:
+- Authentication endpoints: 10 requests per minute (separate rate limit)
+- Bulk operations: 10 requests per hour (separate rate limit)
+- Search API: 60 requests per minute rate limit
+
+## Webhooks and Rate Limits
+Webhook deliveries do NOT count toward your API rate limits. Webhooks have a separate delivery rate limit of 500 events per second.
+
+## Requesting Higher API Rate Limits
+To increase your API rate limits beyond the plan defaults:
+1. Upgrade to a higher plan for automatic rate limit increases
+2. Enterprise customers can request custom rate limits — email enterprise@ourapp.com
+3. Explain your use case and expected API request volume when requesting rate limit increases
+
+## Monitoring API Rate Limit Usage
+Track your API rate limit consumption in the dashboard: Settings > API > Rate Limit Usage. The graph shows hourly API requests vs your rate limit over the past 30 days.`,
   },
   {
     title: "Data Export & GDPR",
@@ -291,27 +314,65 @@ If mobile data doesn't match web:
   {
     title: "SSO / SAML Configuration",
     url: "/docs/sso-saml",
-    content: `# SSO and SAML Configuration
+    content: `# How to Configure SSO Integration
 
-## Supported Providers
-- Okta
-- Azure AD / Microsoft Entra
-- Google Workspace
-- OneLogin
+Single Sign-On (SSO) lets your team log in using your company's identity provider instead of a separate password. This guide explains how to configure SSO integration for your account.
+
+## How to Configure SSO Integration — Overview
+Configuring SSO integration requires admin access. Go to Settings > Security > SSO Integration to begin.
+
+## Supported SSO Providers
+You can configure SSO integration with any of these identity providers:
+- Okta — most common SSO integration setup
+- Azure AD / Microsoft Entra — configure SSO integration using federation metadata
+- Google Workspace — configure SSO integration via Google Admin Console
+- OneLogin — configure SSO integration with SAML app
 - Any SAML 2.0 compatible provider
 
-## Setup (Okta example)
-1. Create new SAML app in Okta
-2. Set ACS URL: https://app.ourapp.com/auth/saml/callback
-3. Set Entity ID: https://app.ourapp.com
-4. Map attributes: email → email, firstName → first_name
-5. Download metadata XML
-6. Upload metadata in our app: Settings > SSO > Upload metadata
+## Step-by-Step: Configure SSO Integration (Okta)
+1. Log in to Okta Admin Console
+2. Create a new SAML 2.0 application
+3. Set ACS (Assertion Consumer Service) URL: https://app.ourapp.com/auth/saml/callback
+4. Set Entity ID / Audience URI: https://app.ourapp.com
+5. Map user attributes: email → email, firstName → first_name, lastName → last_name
+6. Download the SAML metadata XML from Okta
+7. In our app, go to Settings > SSO Integration > Configure SSO
+8. Upload the metadata XML file and save
+9. Test the SSO integration with a pilot user before rolling out
 
-## Troubleshooting
-- "Invalid signature": certificate mismatch, re-download metadata
-- "User not found": email attribute mapping incorrect
-- Redirect loop: check ACS URL is exactly correct (no trailing slash)`,
+## Step-by-Step: Configure SSO Integration (Azure AD)
+1. In Azure portal, create a new Enterprise Application
+2. Choose "Set up single sign-on" and select SAML
+3. Configure Basic SAML: Entity ID and Reply URL as above
+4. Download the Federation Metadata XML
+5. Upload to Settings > SSO Integration > Configure SSO in our app
+
+## Configure SSO Integration — Required Settings
+| Field | Value |
+|---|---|
+| ACS URL | https://app.ourapp.com/auth/saml/callback |
+| Entity ID | https://app.ourapp.com |
+| NameID Format | Email address |
+| Attribute: email | user.email |
+
+## Just-In-Time (JIT) Provisioning
+When you configure SSO integration with JIT provisioning enabled, new users are automatically created on first SSO login. Enable it at Settings > SSO Integration > Provisioning.
+
+## Enforcing SSO for All Users
+After you configure SSO integration and verify it works:
+1. Settings > SSO Integration > Enforcement
+2. Toggle "Require SSO login for all members"
+3. Existing password-based sessions will be invalidated after 24 hours
+
+## Troubleshooting SSO Configuration
+- **"Invalid signature"**: certificate mismatch — re-download and re-upload the metadata
+- **"User not found"**: email attribute mapping is incorrect in your SSO integration config
+- **Redirect loop**: check ACS URL has no trailing slash and matches exactly
+- **"SAML response expired"**: clock skew between your IdP and our servers — ensure server clocks are synchronized
+- **Users can't log in after SSO configure**: verify the email attribute matches the user's account email
+
+## Disabling SSO Integration
+Go to Settings > SSO Integration > Configure SSO > Disable. Users will revert to password login. Send a password reset to all affected users if they never set a password.`,
   },
   {
     title: "Storage Limits and File Management",
@@ -373,57 +434,76 @@ All file types accepted. Preview available for: images, PDFs, videos, Office doc
   {
     title: "Deploying to Production",
     url: "/docs/deploy-production",
-    content: `# Deploying Your App to Production
+    content: `# How to Deploy Your App to Production
 
-## Pre-Deployment Checklist
-Before going live:
-1. Run all tests (unit, integration, e2e)
-2. Review environment variables — never commit secrets
-3. Set NODE_ENV=production
-4. Configure your production database (separate from dev)
-5. Enable error monitoring (Sentry, Datadog, etc.)
-6. Set up uptime monitoring
+This guide explains how to deploy your app to production. Deploying to production makes your application available to real users. Follow these steps to deploy to production successfully.
 
-## Deployment Methods
+## Overview: Deploying Your App to Production
+Deploying an app to production means pushing your code to the live production environment. You can deploy to production using the web dashboard, CLI, or Docker. This guide covers all three ways to deploy to production.
 
-### Option A: One-Click Deploy (Recommended)
+## Before You Deploy to Production
+Pre-deployment checklist — complete these before deploying to production:
+1. Run all tests — never deploy to production with failing tests
+2. Review environment variables — never commit secrets when deploying to production
+3. Set NODE_ENV=production in your production environment config
+4. Configure your production database separately from your development database
+5. Enable error monitoring (Sentry, Datadog, etc.) so you can catch production errors
+6. Set up uptime monitoring to detect outages after deploying to production
+
+## How to Deploy to Production
+
+### Option A: One-Click Deploy to Production (Recommended)
+The simplest way to deploy to production:
 1. Go to Settings > Deployments > New Deployment
 2. Connect your Git repository (GitHub, GitLab, Bitbucket)
-3. Select the branch to deploy (usually main/master)
-4. Configure build command: \`npm run build\` or \`pnpm build\`
-5. Set output directory: \`dist\` or \`build\`
-6. Click Deploy
+3. Select the branch to deploy to production (usually \`main\` or \`master\`)
+4. Configure the build command: \`npm run build\` or \`pnpm build\`
+5. Set the output directory: \`dist\` or \`build\`
+6. Click **Deploy to Production**
 
-### Option B: CLI Deploy
+Your app will be live in production in a few minutes.
+
+### Option B: CLI — Deploy to Production
+To deploy your app to production from the command line:
 \`\`\`bash
 npm install -g @ourapp/cli
 ourapp login
 ourapp deploy --env production
 \`\`\`
 
-### Option C: Docker
+### Option C: Docker — Deploy to Production
 \`\`\`bash
 docker build -t myapp:latest .
 docker push registry.ourapp.com/myapp:latest
-ourapp deploy --image myapp:latest
+ourapp deploy --image myapp:latest --env production
 \`\`\`
 
-## Environment Variables
-Set production env vars in Settings > Deployments > [your deployment] > Environment Variables.
-Never hardcode secrets in source code.
+## Environment Variables for Production Deployment
+Set production environment variables before deploying: Settings > Deployments > [your deployment] > Environment Variables.
+Never hardcode secrets in source code. All production environment variables are encrypted at rest.
 
-## Custom Domains
-After deploying, go to Settings > Domains > Add Domain. Point your DNS CNAME to app.ourapp.com.
+## Custom Domains After Deploying to Production
+After your first production deployment, add a custom domain: Settings > Domains > Add Domain. Point your DNS CNAME to app.ourapp.com. SSL certificates are automatically provisioned for production deployments.
 
-## Rolling Back
-If a deployment fails: Settings > Deployments > [deployment] > Rollback to Previous.
-Rollbacks complete in under 60 seconds.
+## Rolling Back a Production Deployment
+If a production deployment causes issues, roll back immediately:
+Settings > Deployments > [deployment] > Rollback to Previous Version.
+Production rollbacks complete in under 60 seconds.
 
-## Build Failures
-Common causes:
-- Missing environment variables at build time
-- Incompatible Node.js version — specify in .nvmrc or package.json engines field
-- Out-of-memory during build — contact support to increase build memory`,
+## First Production Deployment Guide
+Deploying your app to production for the first time:
+1. Ensure your app works correctly in development
+2. Create a new deployment in Settings > Deployments
+3. Set all required environment variables for production
+4. Connect your repository and select the production branch
+5. Click Deploy — your app will be live in production shortly after the build completes
+
+## Troubleshooting Failed Production Deployments
+Common reasons a deploy to production fails:
+- Missing environment variables at production build time
+- Incompatible Node.js version — specify the version in \`.nvmrc\` or \`package.json engines\` field
+- Out-of-memory error during production build — contact support to increase build memory
+- Database migration failed — run migrations before deploying the new production code`,
   },
   {
     title: "API Authentication & Keys",
