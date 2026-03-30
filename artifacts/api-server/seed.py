@@ -1331,8 +1331,10 @@ def run_seed() -> dict:
     _seed_status = "seeding"
     try:
         from fastembed import TextEmbedding
-        logger.info("Loading fastembed model...")
-        model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+        import os as _os
+        _cache_dir = _os.path.join(_os.path.dirname(__file__), ".model_cache")
+        logger.info(f"Loading fastembed model (cache: {_cache_dir})...")
+        model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5", cache_dir=_cache_dir)
 
         conn = get_db_conn()
         cur = conn.cursor()

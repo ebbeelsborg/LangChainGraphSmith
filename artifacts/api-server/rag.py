@@ -15,13 +15,19 @@ from fastembed import TextEmbedding
 logger = logging.getLogger(__name__)
 
 # ─── Embedding Model (fastembed, ONNX-based, no CUDA) ──────────────────────────
+# Cache the model inside the workspace so it is bundled into the deployment image
+# and does not need to download from HuggingFace at runtime.
+_MODEL_CACHE_DIR = os.path.join(os.path.dirname(__file__), ".model_cache")
 _embedding_model: Optional[TextEmbedding] = None
 
 def get_embedding_model() -> TextEmbedding:
     global _embedding_model
     if _embedding_model is None:
-        logger.info("Loading fastembed model: BAAI/bge-small-en-v1.5")
-        _embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
+        logger.info(f"Loading fastembed model: BAAI/bge-small-en-v1.5 (cache: {_MODEL_CACHE_DIR})")
+        _embedding_model = TextEmbedding(
+            model_name="BAAI/bge-small-en-v1.5",
+            cache_dir=_MODEL_CACHE_DIR,
+        )
     return _embedding_model
 
 @traceable(run_type="embedding", name="fastembed_bge_small")
