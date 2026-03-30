@@ -2,6 +2,8 @@
 
 SupportBrainz is an AI-powered customer support assistant that helps support teams answer tickets faster and more consistently. Instead of searching through wikis and old tickets manually, you ask a question in natural language and get a synthesised answer drawn directly from your knowledge base and ticket history — with numbered citations linking back to every source used.
 
+![SupportBrainz screenshot](docs/screenshot.jpeg)
+
 ---
 
 ## What it can help you with
