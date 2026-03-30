@@ -18,6 +18,11 @@ export function ChatLayout() {
 
   const isGenerating = messages[messages.length - 1]?.isPending;
 
+  const handleGoHome = () => {
+    clearMessages();
+    setInput("");
+  };
+
   // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
@@ -95,7 +100,7 @@ export function ChatLayout() {
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden text-foreground selection:bg-primary/30">
-      <Sidebar />
+      <Sidebar onHome={handleGoHome} />
       
       <main className="flex-1 flex flex-col relative bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-background to-background">
 
@@ -104,7 +109,7 @@ export function ChatLayout() {
           <div className="flex items-center justify-between px-6 py-3 border-b border-border/50 bg-background/60 backdrop-blur-md shrink-0">
             <span className="text-sm font-medium text-foreground/80">SupportBrainz</span>
             <button
-              onClick={clearMessages}
+              onClick={handleGoHome}
               className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2.5 py-1.5 rounded-lg hover:bg-accent"
               title="Start a new chat"
             >
