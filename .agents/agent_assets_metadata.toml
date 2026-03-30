@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "mEsde7eyYCo09uFY9rlND"
+uri = "file://README.md"
+type = "text"
+title = "SupportBrainz README"
