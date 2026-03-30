@@ -81,7 +81,7 @@ Tracing is configured entirely through environment variables (set as Replit secr
 
 | Variable | Value |
 |---|---|
-| `LANGSMITH_API_KEY` | A workspace-scoped API key from your LangSmith account |
+| `LANGSMITH_API_KEY` | A workspace-scoped API service key from your LangSmith account |
 | `LANGSMITH_TRACING` | `true` |
 | `LANGSMITH_ENDPOINT` | `https://api.smith.langchain.com` (US) or `https://eu.api.smith.langchain.com` (EU) |
 | `LANGSMITH_PROJECT` | `supportbrainz` (or any project name you created in LangSmith) |
