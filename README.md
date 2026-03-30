@@ -22,10 +22,10 @@ SupportBrainz is an AI-powered customer support assistant that helps support tea
 | Numbered citations | Inline `[1]` `[2]` `[3]` markers match source cards below the answer |
 | Full source viewer | Click any citation card to read the complete document or ticket in a modal |
 | Suggested questions | Four ready-made queries on the welcome screen to explore the knowledge base |
-| Demo data loader | One-click seed of 25 knowledge-base documents and 100 support tickets |
+| Demo data loader | One-click seed of 25 knowledge-base documents and 30 support tickets with neural embeddings |
 | Zendesk integration | Connect a Zendesk subdomain and API key to import live tickets |
 | Confluence integration | Connect a Confluence space to pull in documentation pages |
-| New Chat / Home | Clear the conversation and return to the welcome screen at any time |
+| New Chat | Clear the conversation and return to the welcome screen at any time |
 | Dark UI | Full dark-mode chat interface built for all-day use |
 
 ---
@@ -36,9 +36,9 @@ SupportBrainz is an AI-powered customer support assistant that helps support tea
 
 RAG is the core architecture of the application. When a user submits a query, the system does not ask the LLM to answer from memory. Instead it:
 
-1. **Embeds** the query into a 384-dimensional vector
-2. **Retrieves** the most semantically similar documents and tickets from PostgreSQL using pgvector
-3. **Evaluates** whether the retrieved context is sufficient to answer the question
+1. **Embeds** the query into a 384-dimensional vector using the `BAAI/bge-small-en-v1.5` model (via fastembed, runs on CPU with ONNX runtime)
+2. **Retrieves** the most semantically similar documents and tickets from PostgreSQL using pgvector cosine similarity
+3. **Evaluates** whether the retrieved context is sufficient to answer the question (via LLM call)
 4. **Generates** an answer grounded in that context, or **refines** the query and re-retrieves if the context was insufficient (one automatic retry)
 5. **Returns** the answer alongside numbered citations pointing to every source used
 
@@ -48,78 +48,56 @@ This guarantees that answers are traceable and hallucinations are minimised, sin
 
 ### pgvector
 
-pgvector is a PostgreSQL extension that adds a native `vector` column type and approximate nearest-neighbour search operators. SupportBrainz stores a 384-dimensional embedding alongside every document and ticket row. At query time, a single SQL statement ranks all rows by cosine similarity to the query embedding:
-
-```sql
-SELECT id, title, content,
-       1 - (embedding <=> $1::vector) AS similarity
-FROM documents
-ORDER BY embedding <=> $1::vector
-LIMIT 5
-```
-
-An `ivfflat` index (with `lists = 10` and `probes = 10` set inside a transaction) ensures the search is both fast and exhaustive — a critical tuning detail, since the default `probes = 1` caused relevant documents to be silently missed for sparse queries.
+pgvector is a PostgreSQL extension that adds vector storage and similarity search. Every document and ticket is stored in PostgreSQL alongside its 384-dimensional embedding vector. When a query arrives, its embedding is compared against all stored vectors using cosine distance — the closest matches are the most semantically relevant items, regardless of exact keyword overlap. An IVFFlat index keeps retrieval fast as the knowledge base grows.
 
 ---
 
 ### LangChain
 
-The retrieval and generation pipeline follows the same conceptual patterns that LangChain popularised: document loaders, text splitters, vector store retrievers, and prompt templates chained together. The current implementation replicates these patterns in TypeScript without the LangChain library as a direct dependency, which keeps the bundle lean and gives full control over retrieval logic (for example, the guaranteed-top-3-docs strategy that prevents long documents from being outranked by short keyword-dense tickets).
+LangChain is used for building the prompt chains within the RAG pipeline. Each step (evaluate, refine, generate) uses a `ChatPromptTemplate` composed with the LLM and a `StrOutputParser` via LangChain Expression Language (LCEL). This makes it straightforward to swap models or change prompting strategies without touching the graph logic.
 
 ---
 
 ### LangGraph
 
-The RAG workflow is modelled directly after LangGraph's node-based state machine concept. The pipeline is a directed graph with explicit typed state (`RagState`) that flows through named nodes:
+LangGraph is a library for building stateful, graph-based workflows on top of LangChain. It models the RAG pipeline as an explicit state machine:
 
 ```
-retrieve → evaluate → generate
-                   ↘ refine → retrieve (retry, max 1)
+retrieve → evaluate → generate (if context is sufficient)
+                   → refine → generate (if context needs improvement)
 ```
 
-Each node is a pure function that receives the current state and returns a partial update. This makes the pipeline easy to reason about, test, and extend — the same design principle that drives LangGraph.
+Each node is a Python function that receives the current `RAGState` (a typed dict containing query, embedding, citations, context, answer, and metadata) and returns a partial update to that state. The conditional edge after `evaluate` routes to either `generate` or `refine` depending on whether the LLM judged the context sufficient. This makes the retry logic explicit, testable, and easy to extend.
 
 ---
 
 ### LangSmith
 
-LangSmith is the observability and tracing platform for LangChain-based applications. The current build uses structured JSON logging (via Pino) to record retrieval results, similarity scores, model finish reasons, and latency at each node. A LangSmith integration would replace this with a hosted trace UI, dataset management, and regression testing across prompt versions — a natural next step as the application matures.
+LangSmith is a tracing and observability platform for LLM applications. When a `LANGSMITH_API_KEY` is configured, every graph execution — including all LLM calls, token counts, and latencies — is automatically traced and viewable in the LangSmith dashboard at smith.langchain.com. No code changes are needed; tracing is enabled by setting `LANGCHAIN_TRACING_V2=true` at startup.
 
 ---
 
-### Python
+### fastembed
 
-The backend is currently implemented in **TypeScript running on Node.js**, not Python. This was chosen to keep the entire stack in one language (TypeScript end-to-end) and avoid native-module build issues in the Replit environment. A Python rewrite using the libraries below would be a straightforward migration, since the RAG architecture maps directly onto Python idioms.
+fastembed is a lightweight Python library for generating text embeddings using ONNX Runtime, without requiring PyTorch or CUDA. It downloads the `BAAI/bge-small-en-v1.5` model (~67MB) on first run and produces 384-dimensional embeddings matching the database schema. Embeddings run on CPU and take ~10ms per text on a typical Replit instance.
 
 ---
 
-### FastAPI
+### Python / FastAPI
 
-The API layer is currently implemented with **Express.js** (TypeScript). FastAPI would be the natural Python equivalent — both expose a REST API, validate request bodies, and serve JSON responses. The Express routes (`POST /api/chat`, `GET /api/documents/:id`, `GET /api/tickets/:id`, `POST /api/seed`, `POST /api/integrations/zendesk`, `POST /api/integrations/confluence`) would translate directly to FastAPI path operations.
+The backend is written in Python using FastAPI, a high-performance ASGI web framework. Endpoints are served by uvicorn with hot-reload in development. All database access uses psycopg2 with PostgreSQL connection pooling. Blocking operations (embedding generation, LangGraph execution) run in a thread pool executor so the async event loop is not blocked.
 
 ---
 
 ### React
 
-The entire frontend is a React single-page application built with Vite and styled with Tailwind CSS. Key React patterns in use:
-
-- **Custom hooks** (`useChatState`) manage message history, pending state, and citation selection
-- **React Query** (`@tanstack/react-query`) handles API calls, caching, and loading/error states
-- **Framer Motion** provides animated message entrances, modal transitions, and suggestion card reveals
-- **Component composition** — `ChatLayout` → `ChatMessage` → `CitationsList` → `CitationModal` — keeps each piece small and focused
+The frontend is a React single-page app built with Vite. It calls the FastAPI backend over HTTP and renders the chat interface, sidebar, citation cards, and citation modals. The UI is styled with Tailwind CSS and shadcn/ui components.
 
 ---
 
-### Replit LLM
+### Replit AI Integration
 
-Answer generation uses the **Replit AI Integrations proxy**, which exposes an OpenAI-compatible API endpoint. The model is `gpt-4o-mini`. Because the proxy is OpenAI-compatible, the standard `openai` npm package is used with the `baseURL` pointed at Replit's proxy and the key supplied by Replit's secret injection — no separate OpenAI account or API key is needed when running inside Replit.
-
-```ts
-const openai = new OpenAI({
-  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
-  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL,
-});
-```
+LLM calls go through Replit's AI Integrations proxy, which provides OpenAI-compatible access without requiring the user to supply their own API key. The proxy is used for the evaluate, refine, and generate steps via LangChain's `ChatOpenAI` client.
 
 ---
 
@@ -127,29 +105,34 @@ const openai = new OpenAI({
 
 ```
 artifacts/
-  api-server/          Express API — RAG pipeline, seed, integrations
-    src/lib/
-      rag.ts           LangGraph-inspired state machine (retrieve → evaluate → generate/refine)
-      embeddings.ts    384-dim feature-hash embeddings (pure TypeScript, zero deps)
-      seed.ts          25 knowledge-base documents + 100 support tickets
-  support-brainz/      React + Vite frontend
+  api-server/          Python FastAPI backend
+    app.py             FastAPI app, all endpoints
+    rag.py             LangGraph RAG workflow (retrieve→evaluate→refine→generate)
+    seed.py            Demo data (25 docs, 30 tickets) + seeding logic
+    start.sh           uvicorn startup script
+
+  support-brainz/      React frontend (Vite)
     src/
-      pages/ChatLayout.tsx          Main chat layout, input, Home/New Chat buttons
-      components/chat/
-        ChatMessage.tsx             Per-message renderer with Markdown + citations
-        Citations.tsx               Clickable citation cards with match scores
-        CitationModal.tsx           Full-content modal (fetches doc/ticket by ID)
-      components/layout/Sidebar.tsx Knowledge-base stats, demo seed, integrations
+      components/
+        chat/          ChatMessage, CitationCard, CitationModal
+        layout/        Sidebar, TopBar
+      pages/
+        ChatLayout.tsx Main chat page with modal state
+      lib/
+        api.ts         API client functions
+
 lib/
-  api-client-react/    Auto-generated React Query hooks from OpenAPI spec
-  db/                  PostgreSQL connection pool (shared across packages)
+  db/                  Drizzle ORM schema (documents, tickets tables)
 ```
 
 ---
 
 ## Getting started
 
-1. Open the project in Replit
-2. Click **Load Demo Data** in the sidebar to seed the knowledge base
-3. Type a question or click one of the four suggested queries
-4. Click any citation card to read the full source document or ticket
+The app seeds itself on first use. Click **Load Demo Data** in the sidebar to embed 25 knowledge-base documents and 30 support tickets. Once loaded, you can ask questions immediately.
+
+Try these sample queries:
+- "How do I reset my password?"
+- "What are the API rate limits?"
+- "How do I configure SSO integration?"
+- "Why am I getting 429 errors?"

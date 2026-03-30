@@ -1,96 +1,149 @@
-# Workspace
+# SupportBrainz — Workspace
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+**SupportBrainz** is an AI-powered customer support RAG assistant.
+
+The backend has been migrated from TypeScript/Express to **Python/FastAPI**. The frontend remains React/Vite (TypeScript). The backend is a standalone Python application — it does NOT use the pnpm/TypeScript toolchain.
+
+---
 
 ## Stack
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
+### Backend (Python)
+- **Language**: Python 3.11
+- **Framework**: FastAPI + uvicorn
+- **RAG workflow**: LangGraph (StateGraph with typed state)
+- **LLM chains**: LangChain (LCEL — ChatPromptTemplate | ChatOpenAI | StrOutputParser)
+- **LLM provider**: OpenAI via Replit AI Integrations proxy (env vars: `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`)
+- **Embeddings**: fastembed (`BAAI/bge-small-en-v1.5`, 384-dim, ONNX/CPU, no CUDA needed)
+- **Database**: PostgreSQL with psycopg2 and pgvector extension
+- **Observability**: LangSmith (env var: `LANGSMITH_API_KEY`, maps to `LANGCHAIN_API_KEY`)
+
+### Frontend (TypeScript)
+- **Framework**: React + Vite
+- **Styling**: Tailwind CSS + shadcn/ui
+- **State**: React Query for API calls
+
+### Shared
+- **Database schema**: lib/db (Drizzle ORM) — `documents` and `tickets` tables with `vector(384)` columns
+- **Monorepo**: pnpm workspaces (frontend only uses this; Python backend is standalone)
+
+---
 
 ## Structure
 
 ```text
-artifacts-monorepo/
-├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
-├── lib/                    # Shared libraries
-│   ├── api-spec/           # OpenAPI spec + Orval codegen config
-│   ├── api-client-react/   # Generated React Query hooks
-│   ├── api-zod/            # Generated Zod schemas from OpenAPI
-│   └── db/                 # Drizzle ORM schema + DB connection
-├── scripts/                # Utility scripts (single workspace package)
-│   └── src/                # Individual .ts scripts, run via `pnpm --filter @workspace/scripts run <script>`
-├── pnpm-workspace.yaml     # pnpm workspace (artifacts/*, lib/*, lib/integrations/*, scripts)
-├── tsconfig.base.json      # Shared TS options (composite, bundler resolution, es2022)
-├── tsconfig.json           # Root TS project references
-└── package.json            # Root package with hoisted devDeps
+artifacts/
+├── api-server/             Python FastAPI backend
+│   ├── app.py              FastAPI app, all endpoints (/api/*)
+│   ├── rag.py              LangGraph RAG state machine
+│   ├── seed.py             Demo data (25 docs + 30 tickets) + seeding logic
+│   ├── start.sh            uvicorn startup script (sets PATH for .pythonlibs)
+│   └── .replit-artifact/
+│       └── artifact.toml   run = "bash /home/runner/workspace/artifacts/api-server/start.sh"
+│
+└── support-brainz/         React frontend (Vite)
+    └── src/
+        ├── components/
+        │   ├── chat/       ChatMessage, CitationCard, CitationModal
+        │   └── layout/     Sidebar, TopBar
+        ├── pages/
+        │   └── ChatLayout.tsx  Main page with modal state
+        └── lib/api.ts      API client
+
+lib/db/                     Drizzle ORM schema (documents, tickets)
+.pythonlibs/                Python venv (managed by uv/pip)
 ```
 
-## TypeScript & Composite Projects
+---
 
-Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references. This means:
+## API Endpoints
 
-- **Always typecheck from the root** — run `pnpm run typecheck` (which runs `tsc --build --emitDeclarationOnly`). This builds the full dependency graph so that cross-package imports resolve correctly. Running `tsc` inside a single package will fail if its dependencies haven't been built yet.
-- **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck; actual JS bundling is handled by esbuild/tsx/vite...etc, not `tsc`.
-- **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references` array. `tsc --build` uses this to determine build order and skip up-to-date packages.
+All endpoints are at `/api/*` on port 8080.
 
-## Root Scripts
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/healthz | Health check |
+| POST | /api/chat | RAG query — body: `{query: string}` |
+| GET | /api/seed/status | Returns `{seeded, document_count, ticket_count}` |
+| POST | /api/seed | Truncate + re-seed with fastembed embeddings |
+| GET | /api/documents/:id | Full document by DB row id |
+| GET | /api/tickets/:id | Full ticket by DB row id |
+| POST | /api/integrations/zendesk | Demo stub |
+| POST | /api/integrations/confluence | Demo stub |
 
-- `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages that define it
-- `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly` using project references
+---
 
-## Packages
+## LangGraph Workflow (rag.py)
 
-### `artifacts/api-server` (`@workspace/api-server`)
+```
+START → retrieve → evaluate → generate → END
+                ↘ refine → generate → END
+```
 
-Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
+- **retrieve**: embed query with fastembed, cosine-similarity search in pgvector (top 3 docs + top 5 tickets)
+- **evaluate**: LLM judges if context is sufficient (returns "yes"/"no")
+- **refine**: LLM rephrases the query, re-embeds, re-retrieves additional context
+- **generate**: LLM generates answer with citation markers [1][2][3] from context
 
-- Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
-- Depends on: `@workspace/db`, `@workspace/api-zod`
-- `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
+State type: `RAGState` (TypedDict) with fields: `query`, `embedding`, `citations`, `context`, `answer`, `sufficient`, `retrieval_steps`
 
-### `lib/db` (`@workspace/db`)
+---
 
-Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
+## Database Schema
 
-- `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas (no models definitions exist right now)
-- `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
-- Exports: `.` (pool, db, schema), `./schema` (schema only)
+```sql
+-- lib/db/src/schema/documents.ts
+documents (id serial, title text, url text, content text, embedding vector(384))
 
-Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
+-- lib/db/src/schema/tickets.ts  
+tickets (id serial, ticket_id text, subject text, tags text[], conversation text, embedding vector(384))
+```
 
-### `lib/api-spec` (`@workspace/api-spec`)
+Both tables use IVFFlat index: `CREATE INDEX ... USING ivfflat (embedding vector_cosine_ops) WITH (lists = 10)`
+Must run `SET ivfflat.probes = 10` before each similarity query.
 
-Owns the OpenAPI 3.1 spec (`openapi.yaml`) and the Orval config (`orval.config.ts`). Running codegen produces output into two sibling packages:
+---
 
-1. `lib/api-client-react/src/generated/` — React Query hooks + fetch client
-2. `lib/api-zod/src/generated/` — Zod schemas
+## Important Notes
 
-Run codegen: `pnpm --filter @workspace/api-spec run codegen`
+### Python packages
+Installed via `pip install` (not uv) since `uv` has issues with sentence-transformers/fastembed on Replit:
+```bash
+python3 -m pip install fastembed
+```
+Core packages installed via `installLanguagePackages`: fastapi, uvicorn, langchain, langchain-openai, langgraph, langsmith, psycopg2-binary, pgvector, python-multipart, numpy
 
-### `lib/api-zod` (`@workspace/api-zod`)
+### LangSmith tracing
+Set in app.py startup: maps `LANGSMITH_API_KEY` → `LANGCHAIN_API_KEY`, sets `LANGCHAIN_TRACING_V2=true`, `LANGCHAIN_PROJECT=supportbrainz`. Tracing is non-critical — 403 errors from LangSmith don't affect functionality.
 
-Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used by `api-server` for response validation.
+### LLM configuration
+ChatOpenAI must NOT use `temperature` or `model_kwargs` for `max_completion_tokens`. Use direct parameters:
+```python
+ChatOpenAI(model="gpt-5-mini", api_key=..., base_url=..., max_completion_tokens=1024)
+```
+Using `model_kwargs={"max_completion_tokens": ...}` causes empty responses from the Replit proxy.
 
-### `lib/api-client-react` (`@workspace/api-client-react`)
+### Embedding model
+fastembed downloads `BAAI/bge-small-en-v1.5` (~67MB ONNX) from HuggingFace on first use. The model is cached in the fastembed cache directory. After `run_seed()`, all vectors in the DB use this model's embedding space.
 
-Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
+### Re-seeding
+After any change to the embedding model, click "Load Demo Data" in the UI (or POST /api/seed) to TRUNCATE and re-seed with correct embeddings.
 
-### `scripts` (`@workspace/scripts`)
+---
 
-Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+## Frontend Field Mapping
+
+The frontend's Sidebar expects these field names from `/api/seed/status`:
+- `seeded` (boolean)
+- `document_count` (integer) — snake_case
+- `ticket_count` (integer) — snake_case
+
+The chat response from `/api/chat` returns:
+- `answer` (string)
+- `citations` (array of `{id, type, title, url?, ticketId?, score, index}`)
+- `retrievalSteps` (integer)
+
+Citations with `type: "document"` use `id` to fetch `/api/documents/{id}`.
+Citations with `type: "ticket"` use `id` to fetch `/api/tickets/{id}`.
