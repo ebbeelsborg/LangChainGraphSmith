@@ -73,7 +73,32 @@ Each node is a Python function that receives the current `RAGState` (a typed dic
 
 ### LangSmith
 
-LangSmith is a tracing and observability platform for LLM applications. When a `LANGSMITH_API_KEY` is configured, every graph execution — including all LLM calls, token counts, and latencies — is automatically traced and viewable in the LangSmith dashboard at smith.langchain.com. No code changes are needed; tracing is enabled by setting `LANGCHAIN_TRACING_V2=true` at startup.
+LangSmith is a tracing and observability platform for LLM applications. Every chat query produces a full trace in the LangSmith dashboard showing the complete pipeline — embeddings, vector searches, LLM calls, token counts, and latencies — all nested under a single root span.
+
+Tracing is configured entirely through environment variables (set as Replit secrets):
+
+| Variable | Value |
+|---|---|
+| `LANGSMITH_API_KEY` | A workspace-scoped API key from your LangSmith account |
+| `LANGSMITH_TRACING` | `true` |
+| `LANGSMITH_ENDPOINT` | `https://api.smith.langchain.com` (US) or `https://eu.api.smith.langchain.com` (EU) |
+| `LANGSMITH_PROJECT` | `supportbrainz` (or any project name you created in LangSmith) |
+
+The SDK (v0.7.x+) reads these `LANGSMITH_*` variables natively — no additional code configuration is required.
+
+In addition, each key function in `rag.py` is decorated with `@traceable` to produce named spans in the trace tree:
+
+| Function | Span type |
+|---|---|
+| `embed_text` | `embedding` — fastembed_bge_small |
+| `retrieve_similar` | `retriever` — pgvector_similarity_search |
+| `retrieve_node` | `retriever` — full retrieve step |
+| `evaluate_node` | `llm` — context sufficiency check |
+| `refine_node` | `chain` — query refinement + re-retrieval |
+| `generate_node` | `llm` — answer generation |
+| `run_rag` | `chain` — top-level pipeline |
+
+**Note on API keys:** Create a workspace-scoped key in LangSmith (Settings → API Keys). Do not set `LANGSMITH_WORKSPACE_ID` — the SDK resolves the workspace from the key automatically. Setting it to any value other than your workspace UUID will cause authentication failures.
 
 ---
 
@@ -85,7 +110,7 @@ fastembed is a lightweight Python library for generating text embeddings using O
 
 ### Python / FastAPI
 
-The backend is written in Python using FastAPI, a high-performance ASGI web framework. Endpoints are served by uvicorn with hot-reload in development. All database access uses psycopg2 with PostgreSQL connection pooling. Blocking operations (embedding generation, LangGraph execution) run in a thread pool executor so the async event loop is not blocked.
+The backend is written in Python using FastAPI, a high-performance ASGI web framework. Endpoints are served by uvicorn (no hot-reload, so a full workflow restart is needed after code changes). All database access uses psycopg2 with PostgreSQL connection pooling. Blocking operations (embedding generation, LangGraph execution) run in a thread pool executor so the async event loop is not blocked.
 
 ---
 
