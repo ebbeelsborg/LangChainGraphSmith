@@ -1,16 +1,15 @@
-import os
 import logging
-from typing import TypedDict, List, Optional, Any
-
-from langgraph.graph import StateGraph, END
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langsmith import traceable
+import os
+from typing import TypedDict
 
 import psycopg2
 import psycopg2.extras
 from fastembed import TextEmbedding
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_openai import ChatOpenAI
+from langgraph.graph import END, StateGraph
+from langsmith import traceable
 
 logger = logging.getLogger(__name__)
 
@@ -18,20 +17,24 @@ logger = logging.getLogger(__name__)
 # Cache the model inside the workspace so it is bundled into the deployment image
 # and does not need to download from HuggingFace at runtime.
 _MODEL_CACHE_DIR = os.path.join(os.path.dirname(__file__), ".model_cache")
-_embedding_model: Optional[TextEmbedding] = None
+_embedding_model: TextEmbedding | None = None
+
 
 def get_embedding_model() -> TextEmbedding:
     global _embedding_model
     if _embedding_model is None:
-        logger.info(f"Loading fastembed model: BAAI/bge-small-en-v1.5 (cache: {_MODEL_CACHE_DIR})")
+        logger.info(
+            f"Loading fastembed model: BAAI/bge-small-en-v1.5 (cache: {_MODEL_CACHE_DIR})"
+        )
         _embedding_model = TextEmbedding(
             model_name="BAAI/bge-small-en-v1.5",
             cache_dir=_MODEL_CACHE_DIR,
         )
     return _embedding_model
 
+
 @traceable(run_type="embedding", name="fastembed_bge_small")
-def embed_text(text: str) -> List[float]:
+def embed_text(text: str) -> list[float]:
     model = get_embedding_model()
     embeddings = list(model.embed([text]))
     return embeddings[0].tolist()
@@ -52,8 +55,8 @@ def get_llm() -> ChatOpenAI:
 # ─── LangGraph State ──────────────────────────────────────────────────────────
 class RAGState(TypedDict):
     query: str
-    embedding: List[float]
-    citations: List[dict]
+    embedding: list[float]
+    citations: list[dict]
     context: str
     answer: str
     sufficient: bool
@@ -65,12 +68,12 @@ def get_db_conn():
     return psycopg2.connect(os.environ["DATABASE_URL"])
 
 
-def vector_to_pg(vec: List[float]) -> str:
+def vector_to_pg(vec: list[float]) -> str:
     return "[" + ",".join(str(v) for v in vec) + "]"
 
 
 @traceable(run_type="retriever", name="pgvector_similarity_search")
-def retrieve_similar(embedding: List[float], table: str, limit: int) -> List[dict]:
+def retrieve_similar(embedding: list[float], table: str, limit: int) -> list[dict]:
     vec_str = vector_to_pg(embedding)
     with get_db_conn() as conn:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
@@ -113,44 +116,57 @@ Rules:
 - Do NOT make up information not present in the context.
 """
 
-GENERATE_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", SYSTEM_PROMPT),
-    ("human", "Context (cite these sources):\n{context}\n\nQuestion: {query}"),
-])
+GENERATE_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        ("system", SYSTEM_PROMPT),
+        ("human", "Context (cite these sources):\n{context}\n\nQuestion: {query}"),
+    ]
+)
 
 REFINE_SYSTEM = """You are a search query optimizer for a customer support knowledge base.
 Your job is to rephrase the user's question to be broader and more likely to match 
 documentation or support tickets. Return ONLY the rephrased query, nothing else."""
 
-REFINE_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", REFINE_SYSTEM),
-    ("human", "Original question: {query}\n\nRephrased search query:"),
-])
+REFINE_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        ("system", REFINE_SYSTEM),
+        ("human", "Original question: {query}\n\nRephrased search query:"),
+    ]
+)
 
 EVALUATE_SYSTEM = """You are evaluating whether retrieved context is sufficient to answer a support question.
 Respond with ONLY 'yes' or 'no'. Yes means the context contains enough information to give a useful answer."""
 
-EVALUATE_PROMPT = ChatPromptTemplate.from_messages([
-    ("system", EVALUATE_SYSTEM),
-    ("human", "Question: {query}\n\nContext:\n{context}\n\nIs the context sufficient? (yes/no):"),
-])
+EVALUATE_PROMPT = ChatPromptTemplate.from_messages(
+    [
+        ("system", EVALUATE_SYSTEM),
+        (
+            "human",
+            "Question: {query}\n\nContext:\n{context}\n\nIs the context sufficient? (yes/no):",
+        ),
+    ]
+)
 
 
 # ─── Format citations & context ───────────────────────────────────────────────
-def build_citations_and_context(docs: List[dict], tickets: List[dict]) -> tuple[List[dict], str]:
+def build_citations_and_context(
+    docs: list[dict], tickets: list[dict]
+) -> tuple[list[dict], str]:
     citations = []
     context_parts = []
 
     for i, doc in enumerate(docs, start=1):
         score = float(doc.get("score", 0))
-        citations.append({
-            "id": doc["id"],
-            "type": "document",
-            "title": doc["title"],
-            "url": doc.get("url", ""),
-            "score": score,
-            "index": i,
-        })
+        citations.append(
+            {
+                "id": doc["id"],
+                "type": "document",
+                "title": doc["title"],
+                "url": doc.get("url", ""),
+                "score": score,
+                "index": i,
+            }
+        )
         context_parts.append(
             f"[{i}] DOCUMENTATION: {doc['title']}\n{doc['content'][:800]}"
         )
@@ -158,14 +174,16 @@ def build_citations_and_context(docs: List[dict], tickets: List[dict]) -> tuple[
     offset = len(docs)
     for i, ticket in enumerate(tickets, start=offset + 1):
         score = float(ticket.get("score", 0))
-        citations.append({
-            "id": ticket["id"],
-            "type": "ticket",
-            "title": f"{ticket['ticket_id']}: {ticket['subject']}",
-            "ticketId": ticket["ticket_id"],
-            "score": score,
-            "index": i,
-        })
+        citations.append(
+            {
+                "id": ticket["id"],
+                "type": "ticket",
+                "title": f"{ticket['ticket_id']}: {ticket['subject']}",
+                "ticketId": ticket["ticket_id"],
+                "score": score,
+                "index": i,
+            }
+        )
         tags_str = ", ".join(ticket.get("tags", []) or [])
         context_parts.append(
             f"[{i}] SUPPORT TICKET {ticket['ticket_id']}: {ticket['subject']}\n"
@@ -203,7 +221,9 @@ def evaluate_node(state: RAGState) -> dict:
     try:
         llm = get_llm()
         chain = EVALUATE_PROMPT | llm | StrOutputParser()
-        result = chain.invoke({"query": state["query"], "context": state["context"][:2000]})
+        result = chain.invoke(
+            {"query": state["query"], "context": state["context"][:2000]}
+        )
         sufficient = result.strip().lower().startswith("yes")
     except Exception as e:
         logger.warning(f"Evaluate node error: {e}; defaulting to sufficient=True")
@@ -235,7 +255,11 @@ def refine_node(state: RAGState) -> dict:
     new_citations, new_context = build_citations_and_context(new_docs, new_tickets)
 
     merged_citations = existing_citations + new_citations
-    merged_context = state.get("context", "") + "\n\n---\n\n" + new_context if new_context else state.get("context", "")
+    merged_context = (
+        state.get("context", "") + "\n\n---\n\n" + new_context
+        if new_context
+        else state.get("context", "")
+    )
 
     return {
         "citations": merged_citations[:8],
@@ -249,10 +273,14 @@ def generate_node(state: RAGState) -> dict:
     try:
         llm = get_llm()
         chain = GENERATE_PROMPT | llm | StrOutputParser()
-        answer = chain.invoke({"query": state["query"], "context": state["context"][:6000]})
+        answer = chain.invoke(
+            {"query": state["query"], "context": state["context"][:6000]}
+        )
     except Exception as e:
         logger.error(f"Generate node error: {e}")
-        answer = "I'm sorry, I encountered an error generating a response. Please try again."
+        answer = (
+            "I'm sorry, I encountered an error generating a response. Please try again."
+        )
 
     return {"answer": answer.strip()}
 
@@ -286,6 +314,7 @@ def build_rag_graph():
 
 
 _rag_graph = None
+
 
 def get_rag_graph():
     global _rag_graph

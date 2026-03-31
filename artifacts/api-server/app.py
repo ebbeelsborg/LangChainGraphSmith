@@ -1,6 +1,6 @@
-import os
-import logging
 import asyncio
+import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 
 # ─── LangSmith tracing setup (must be before other langchain imports) ──────────
@@ -14,19 +14,19 @@ _ls_tracing = os.environ.get("LANGSMITH_TRACING", "(not set)")
 _ls_project = os.environ.get("LANGSMITH_PROJECT", "(not set)")
 # Log non-sensitive prefix only for diagnosis
 import logging as _logging
+
 _logging.basicConfig(level=_logging.INFO)
 _logging.getLogger(__name__).info(
     f"LangSmith config — endpoint: {_ls_endpoint}, tracing: {_ls_tracing}, "
     f"project: {_ls_project}, key_set: {bool(_ls_key)}, key_prefix: {_ls_key[:12]}..."
 )
 
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Optional
 
 import psycopg2
 import psycopg2.extras
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def get_db_conn():
 # ─── Request/Response Models ──────────────────────────────────────────────────
 class ChatRequest(BaseModel):
     query: str
-    conversationHistory: Optional[List[dict]] = []
+    conversationHistory: list[dict] | None = []
 
 
 class SeedRequest(BaseModel):
@@ -85,6 +85,7 @@ async def chat(req: ChatRequest):
     loop = asyncio.get_event_loop()
     try:
         from rag import run_rag
+
         result = await loop.run_in_executor(_executor, run_rag, req.query.strip())
         return result
     except Exception as e:
@@ -95,6 +96,7 @@ async def chat(req: ChatRequest):
 @app.get("/api/seed/status")
 def seed_status():
     from seed import get_seed_status
+
     return get_seed_status()
 
 
@@ -103,6 +105,7 @@ async def seed():
     loop = asyncio.get_event_loop()
     try:
         from seed import run_seed
+
         result = await loop.run_in_executor(_executor, run_seed)
         return result
     except Exception as e:
@@ -177,7 +180,9 @@ def list_documents():
     try:
         with get_db_conn() as conn:
             with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
-                cur.execute("SELECT id, title, url FROM documents ORDER BY id LIMIT 100")
+                cur.execute(
+                    "SELECT id, title, url FROM documents ORDER BY id LIMIT 100"
+                )
                 rows = cur.fetchall()
         return [dict(r) for r in rows]
     except Exception as e:

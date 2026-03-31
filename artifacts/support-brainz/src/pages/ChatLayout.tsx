@@ -69,15 +69,17 @@ export function ChatLayout() {
           isPending: false
         });
       },
-      onError: (err: any) => {
+      onError: (err: unknown) => {
         updateMessage(aiMsgId, {
           content: "I encountered an error while trying to process your request. Please ensure the backend and API integrations are fully configured.",
           isPending: false
         });
+        const description =
+          err instanceof Error ? err.message : "Unknown error occurred.";
         toast({
           variant: "destructive",
           title: "Failed to generate answer",
-          description: err.message || "Unknown error occurred.",
+          description,
         });
       }
     });

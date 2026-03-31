@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Database, Cable, Ticket, FileText, ChevronDown, CheckCircle2, Loader2, Link2, ShieldCheck, AlertCircle } from "lucide-react";
+import { Database, Cable, Ticket, FileText, ChevronDown, Loader2, Link2, ShieldCheck, AlertCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQueryClient } from "@tanstack/react-query";
 import { 
@@ -16,8 +16,8 @@ import { cn } from "@/lib/utils";
 export function Sidebar() {
   const { data: seedStatus, isLoading: statusLoading } = useGetSeedStatus();
   const { mutate: seedData, isPending: isSeeding } = useSeedData();
-  const { mutate: connectZendesk, isPending: isConnectingZendesk } = useConnectZendesk();
-  const { mutate: connectConfluence, isPending: isConnectingConfluence } = useConnectConfluence();
+  const { mutate: _connectZendesk, isPending: isConnectingZendesk } = useConnectZendesk();
+  const { mutate: _connectConfluence, isPending: isConnectingConfluence } = useConnectConfluence();
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -42,11 +42,12 @@ export function Sidebar() {
           description: data.message || `Loaded ${data.documents_seeded} docs and ${data.tickets_seeded} tickets.`,
         });
       },
-      onError: (err: any) => {
+      onError: (err: unknown) => {
+        const message = err instanceof Error ? err.message : "An error occurred while seeding data.";
         toast({
           variant: "destructive",
           title: "Seeding Failed",
-          description: err.message || "An error occurred while seeding data.",
+          description: message,
         });
       }
     });
